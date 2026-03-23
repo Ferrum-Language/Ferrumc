@@ -1,40 +1,64 @@
-# ferrumc
+# Ferrum
 
-The **Ferrum compiler** — takes `.fe` source files and produces native binaries via LLVM 18.
+(I'm 11 years old and I built this with Claude Code. For any issues, open one on GitHub or email me at tomy.martin.grinberg@gmail.com. This is non-profit.)
 
-**Syntax:** C &nbsp;|&nbsp; **Safety:** compile-time checked &nbsp;|&nbsp; **License:** GNU GPL v3
+This is licensed under the GNU GPL v3 https://github.com/tomymartingrinberg-cpu/ferrum/blob/main/LICENSE
+
+Esto esta bajo la GNU GPL v3 https://github.com/tomymartingrinberg-cpu/ferrum/blob/main/LICENSE
+
+**Syntax: C | Safety: compile-time checked | Ecosystem: C++**
+
+Ferrum is a systems programming language that takes C's syntax and adds compile-time memory safety checks. If the program compiles, there are no use-after-free, double free, or dangling pointer bugs.
+
+```c
+#include <stdio.h>
+
+int main() {
+    int* p = new int(42);      // heap allocation
+    int* q = move(p);          // transfers ownership — p is now invalid
+
+    printf("q = %d\n", *q);   // OK
+    // printf("%d\n", *p);     // error[E0382]: use of moved value 'p'
+                               // the compiler rejects this
+    return 0;
+    // free(q) inserted automatically
+}
+```
+
+> Also available in: [Español](README.es.md)
 
 ---
 
-## What it does
+## Why Ferrum
 
-`ferrumc` compiles Ferrum source code (`.fe` files) through five stages:
+C is fast and simple, but it doesn't protect the programmer from memory errors. Ferrum fixes that without changing the syntax or adding a garbage collector.
 
-```
-.fe source
-    │
-    ▼
- Lexer          tokenizes C-style syntax, lifetimes 'a, #include → import
-    │
-    ▼
- Parser         builds AST: functions, structs, generics, unsafe blocks
-    │
-    ▼
- TypeChecker    infers types, validates generics, resolves C headers
-    │
-    ▼
- BorrowChecker  enforces ownership, moves, borrows, lifetimes, unsafe
-    │
-    ▼
- Codegen        emits LLVM IR, inserts automatic free() per scope
-    │
-    ▼
- llc + gcc      produces a native binary
-```
+| Bug | C | Ferrum |
+|-----|---|--------|
+| Use-after-free | Runtime crash | Compile-time error |
+| Double free | Runtime crash | Compile-time error |
+| Use-after-move | Undefined behavior | Compile-time error |
+| Dangling borrow | Invalid memory access | Compile-time error |
+| Uncontrolled raw pointer | No protection | Only inside `unsafe {}` |
 
 ---
 
-## Requirements
+## Features
+
+- **C compatible** — all valid C code is valid Ferrum code
+- **`#include` and `import`** — both forms are accepted
+- **Ownership and move semantics** — `new`, `move()`, automatic free when leaving scope
+- **Borrow checker** — `int& p` (immutable), `int&mut p` (mutable), enforced at compile time
+- **Lifetimes** — `'a` annotations, automatically inferred in most cases
+- **Explicit unsafe** — `unsafe {}` isolates low-level code
+- **Generics** — `T func<T>(T x)`, `struct Pair<A, B>`
+- **Compiles to native binary** — via LLVM 18
+
+---
+
+## Installation
+
+### Requirements
 
 - `g++` with C++20
 - LLVM 18 (`llvm-config`, `llc`)
@@ -45,13 +69,11 @@ The **Ferrum compiler** — takes `.fe` source files and produces native binarie
 sudo apt install llvm-18 llvm-18-dev gcc g++ build-essential
 ```
 
----
-
-## Build
+### Build the compiler
 
 ```bash
-git clone https://github.com/Ferrum-Language/ferrumc.git
-cd ferrumc
+git clone https://github.com/tomymartingrinberg-cpu/ferrum
+cd ferrum
 bash build.sh
 ```
 
@@ -65,7 +87,7 @@ This produces `build/ferrumc`.
 # Compile a .fe file to a binary
 ./build/ferrumc file.fe -o my_program
 
-# Print the generated LLVM IR instead of compiling
+# View the generated LLVM IR
 ./build/ferrumc file.fe --emit-ir
 
 # Run
@@ -74,57 +96,165 @@ This produces `build/ferrumc`.
 
 ---
 
-## Compile errors
+## Examples
 
-| Code | Meaning |
-|------|---------|
-| `E0382` | Use of variable after `move()` |
-| `E0502` | Borrow conflict (mutable + immutable at the same time) |
-| `E0505` | Use of pointer after free |
-| `E0596` | Mutation while a borrow is active |
-| `E0597` | Borrow outlives the value it borrows from |
-| `E0133` | `unsafe` pointer outside an `unsafe {}` block |
+### Hello world (C style)
+
+```c
+#include <stdio.h>
+
+int main() {
+    printf("Hello from Ferrum!\n");
+    return 0;
+}
+```
+
+### Ownership and move
+
+```c
+#include <stdio.h>
+
+int main() {
+    int* a = new int(100);   // a is the owner
+    int* b = move(a);        // b takes ownership
+
+    printf("%d\n", *b);      // OK
+    // *a                    // error[E0382]: use of moved value 'a'
+
+    return 0;
+    // free(b) automatic
+}
+```
+
+### Borrows
+
+```c
+#include <stdio.h>
+
+int main() {
+    int x = 42;
+
+    int& read_x  = &x;       // immutable borrow — read only
+    int&mut edit = &mut x;   // mutable borrow — read and write
+
+    // int& other = &x;      // error[E0502]: x already has a mutable borrow
+
+    *edit = 99;
+    printf("%d\n", x);       // 99
+    return 0;
+}
+```
+
+### Unsafe
+
+```c
+#include <stdio.h>
+
+int main() {
+    int x = 10;
+
+    // int* unsafe p = &x;   // error[E0133]: outside unsafe block
+
+    unsafe {
+        int* unsafe p = &x;  // OK inside unsafe
+        printf("%d\n", *p);
+    }
+    return 0;
+}
+```
+
+### Generics
+
+```c
+#include <stdio.h>
+
+int maximum<T>(T a, T b) {
+    if (a > b) return a;
+    return b;
+}
+
+int main() {
+    printf("%d\n", maximum<int>(3, 7));    // 7
+    return 0;
+}
+```
 
 ---
 
-## Source layout
+## Compiler errors
+
+| Code | Description |
+|------|-------------|
+| `E0382` | Use of variable after `move()` |
+| `E0502` | Borrow conflict (mutable + immutable) |
+| `E0505` | Use of pointer after free |
+| `E0596` | Mutation while borrow is active |
+| `E0597` | Borrow outlives the value it borrows from |
+| `E0133` | `unsafe` pointer outside `unsafe {}` block |
+
+---
+
+## Project structure
 
 ```
-ferrumc/
+ferrum/
 ├── include/ferrum/
-│   ├── Token.h          # Token types
-│   ├── Lexer.h          # Lexer interface
-│   ├── AST.h            # Abstract syntax tree nodes
-│   ├── Parser.h         # Parser interface
+│   ├── Token.h          # Language tokens
+│   ├── Lexer.h          # Lexer
+│   ├── AST.h            # Abstract syntax tree
+│   ├── Parser.h         # Parser
 │   ├── TypeChecker.h    # Type system (Sema)
-│   ├── BorrowChecker.h  # Ownership and borrow checker
+│   ├── BorrowChecker.h  # Ownership verifier
 │   └── Codegen.h        # LLVM IR generator
 ├── src/
-│   ├── lexer/Lexer.cpp
-│   ├── parser/Parser.cpp
-│   ├── sema/TypeChecker.cpp
-│   ├── borrow/BorrowChecker.cpp
-│   ├── codegen/Codegen.cpp
-│   └── driver/main.cpp  # Entry point
-├── tests/               # .fe test programs and C++ unit tests
-├── CMakeLists.txt
-└── build.sh
+│   ├── lexer/
+│   ├── parser/
+│   ├── sema/
+│   ├── borrow/
+│   ├── codegen/
+│   └── driver/main.cpp  # Compiler entry point
+├── tests/
+│   ├── hello.fe
+│   ├── counter.fe
+│   ├── factorial_ferrum.fe
+│   ├── test_lexer.cpp
+│   └── test_borrow.cpp
+├── docs/
+│   └── SPEC.md          # Full language specification
+└── build.sh             # Build script
 ```
 
 ---
 
-## Running the tests
+## Compiler pipeline
 
-```bash
-cd build
-ctest --output-on-failure
+```
+.fe / .c source
+      │
+      ▼
+   Lexer          (#include → import, lifetimes 'a, tokens)
+      │
+      ▼
+   Parser         (AST, generics, unsafe blocks)
+      │
+      ▼
+   TypeChecker    (type inference, generics, C headers)
+      │
+      ▼
+   BorrowChecker  (ownership, moves, borrows, lifetimes, unsafe)
+      │
+      ▼
+   Codegen        (LLVM IR, automatic free() per scope)
+      │
+      ▼
+   llc + gcc      (native binary)
 ```
 
 ---
 
-## License
+## Full documentation
 
-GNU General Public License v3.0 — see [LICENSE](LICENSE).
+See [`docs/SPEC.md`](docs/SPEC.md) for the full language specification.
 
 ---
 
@@ -133,5 +263,4 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 - [Ferrum-Language/Ferrum](https://github.com/Ferrum-Language/Ferrum) — language spec, docs, full repo
 - [Ferrum-Language/ferrum-examples](https://github.com/Ferrum-Language/ferrum-examples) — example programs in Ferrum
 
-- 
-*Ferrum-language Compiler v0.3 — [Ferrum-Language](https://github.com/Ferrum-Language)*
+*Ferrum-language Compiler v0.3 — LLVM 18*
