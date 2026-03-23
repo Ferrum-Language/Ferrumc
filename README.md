@@ -132,3 +132,6 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 
 - [Ferrum-Language/Ferrum](https://github.com/Ferrum-Language/Ferrum) — language spec, docs, full repo
 - [Ferrum-Language/ferrum-examples](https://github.com/Ferrum-Language/ferrum-examples) — example programs in Ferrum
+
+- 
+*Ferrum-language Compiler v0.3 — [Ferrum-Language](https://github.com/Ferrum-Language)*
